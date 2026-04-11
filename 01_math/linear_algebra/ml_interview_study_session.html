@@ -1,0 +1,177 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.session { padding: 1rem 0; }
+.header { margin-bottom: 1.5rem; }
+.header h2 { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
+.header p { font-size: 13px; color: var(--color-text-secondary); margin-top: 4px; }
+.progress-bar-wrap { background: var(--color-background-secondary); border-radius: 8px; height: 8px; margin: 1rem 0; overflow: hidden; }
+.progress-bar { height: 8px; background: #534AB7; border-radius: 8px; transition: width 0.5s ease; }
+.progress-label { font-size: 12px; color: var(--color-text-secondary); display: flex; justify-content: space-between; margin-top: 4px; }
+.blocks { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
+.block { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px 16px; background: var(--color-background-primary); cursor: pointer; transition: border-color 0.15s; }
+.block:hover { border-color: var(--color-border-secondary); }
+.block.active { border-color: #534AB7; border-width: 1.5px; }
+.block.done { border-color: #0F6E56; border-width: 1px; }
+.block-header { display: flex; align-items: center; justify-content: space-between; }
+.block-meta { display: flex; align-items: center; gap: 8px; }
+.block-num { width: 24px; height: 24px; border-radius: 50%; background: var(--color-background-secondary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--color-text-secondary); flex-shrink: 0; }
+.block.active .block-num { background: #EEEDFE; color: #3C3489; }
+.block.done .block-num { background: #E1F5EE; color: #085041; font-size: 14px; }
+.block-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+.block-time { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; }
+.block-desc { font-size: 13px; color: var(--color-text-secondary); margin-top: 8px; line-height: 1.5; }
+.block-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+.tag-math { background: #EEEDFE; color: #3C3489; }
+.tag-code { background: #E1F5EE; color: #085041; }
+.tag-interview { background: #FAEEDA; color: #633806; }
+.tag-exercise { background: #FAECE7; color: #993C1D; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { font-size: 13px; padding: 7px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-primary); cursor: pointer; transition: background 0.12s; }
+.btn:hover { background: var(--color-background-secondary); }
+.btn-primary { background: #534AB7; color: #EEEDFE; border-color: #534AB7; }
+.btn-primary:hover { background: #3C3489; }
+.btn-done { background: #0F6E56; color: #E1F5EE; border-color: #0F6E56; }
+.btn-done:hover { background: #085041; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 1rem; }
+.stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; }
+.stat-val { font-size: 22px; font-weight: 500; color: var(--color-text-primary); }
+.stat-lbl { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+.note-box { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 14px; font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; margin-top: 1rem; border-left: 2px solid #534AB7; }
+</style>
+
+<div class="session">
+  <div class="header">
+    <h2>1-hour ML interview prep — linear algebra</h2>
+    <p>Study mode · Rigorous math + exercises · Today's session</p>
+  </div>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="pbar" style="width: 0%"></div>
+  </div>
+  <div class="progress-label">
+    <span id="prog-text">0 of 5 blocks complete</span>
+    <span id="prog-pct">0%</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="s-done">0</div><div class="stat-lbl">Blocks done</div></div>
+    <div class="stat"><div class="stat-val" id="s-min">60</div><div class="stat-lbl">Minutes left</div></div>
+    <div class="stat"><div class="stat-val" id="s-ex">8</div><div class="stat-lbl">Exercises total</div></div>
+  </div>
+
+  <div class="blocks" style="margin-top: 1.25rem;" id="blocks-list">
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="sendPrompt('Start Block 1: Matrix operations — teach me the theory with derivations and give me the first exercise')">▶ Start block 1</button>
+    <button class="btn" onclick="sendPrompt('Give me a harder exercise on the current topic')">Harder exercise ↑</button>
+    <button class="btn" onclick="sendPrompt('Simplify the current concept — give me an intuition and analogy')">Simplify ↓</button>
+    <button class="btn" onclick="sendPrompt('Switch to Interview Mode and quiz me on what we just covered')">Interview me</button>
+  </div>
+
+  <div class="note-box" id="note-box">
+    Click a block to begin, or hit <strong>Start block 1</strong>. Mark blocks done as you go — your progress is tracked above.
+  </div>
+</div>
+
+<script>
+const blocks = [
+  {
+    title: "Matrix operations & geometry",
+    time: "0–12 min",
+    desc: "Matrix multiplication as function composition. Rank, null space, column space. Why rank matters for ML (data redundancy, feature independence). Geometric interpretation of linear maps.",
+    tags: ["math","interview"],
+    exercises: 2,
+    prompt: "Start Block 1: Matrix operations — explain matrix multiplication as function composition with geometric intuition, derive the rank-nullity theorem, then give me Exercise 1"
+  },
+  {
+    title: "Eigenvalues & eigenvectors",
+    time: "12–25 min",
+    desc: "Characteristic polynomial derivation. Spectral decomposition A = QΛQᵀ for symmetric matrices. Why PCA lives here — covariance matrix eigenvectors are principal components.",
+    tags: ["math","interview","exercise"],
+    exercises: 2,
+    prompt: "Start Block 2: Eigenvalues — derive the characteristic polynomial from scratch, explain spectral decomposition, connect it to PCA, then give me Exercise 2"
+  },
+  {
+    title: "SVD — the workhorse decomposition",
+    time: "25–40 min",
+    desc: "Full derivation of A = UΣVᵀ from eigendecomposition. Relationship to PCA. Low-rank approximation (Eckart-Young theorem). Applications: recommender systems, NLP, compression.",
+    tags: ["math","interview","exercise"],
+    exercises: 2,
+    prompt: "Start Block 3: SVD — derive A = UΣVᵀ from the eigendecomposition of AᵀA, prove the Eckart-Young theorem, and give me Exercise 3"
+  },
+  {
+    title: "Numerical implementation from scratch",
+    time: "40–52 min",
+    desc: "Implement PCA using only NumPy (no sklearn). Power iteration for dominant eigenvector. Discuss numerical stability (why we prefer SVD over eigendecomp in practice).",
+    tags: ["code","exercise"],
+    exercises: 1,
+    prompt: "Start Block 4: Implementation — help me implement PCA from scratch using only NumPy, starting with the covariance matrix, then eigenvectors, then projection. Include test cases."
+  },
+  {
+    title: "Interview Q&A gauntlet",
+    time: "52–60 min",
+    desc: "8-minute rapid-fire interview drill. Questions from easy to hard. You answer, I give feedback. Common traps: confusing SVD with eigendecomp, forgetting orthogonality conditions, rank edge cases.",
+    tags: ["interview","exercise"],
+    exercises: 1,
+    prompt: "Start Block 5: Interview mode — ask me 5 interview questions on linear algebra for ML, escalating difficulty, one at a time. Push back on vague answers."
+  }
+];
+
+const tagLabels = { math: "rigorous math", code: "implementation", interview: "interview Q", exercise: "exercises" };
+const tagClasses = { math: "tag-math", code: "tag-code", interview: "tag-interview", exercise: "tag-exercise" };
+const timings = [12, 13, 15, 12, 8];
+let done = new Array(blocks.length).fill(false);
+
+function render() {
+  const list = document.getElementById('blocks-list');
+  list.innerHTML = '';
+  blocks.forEach((b, i) => {
+    const div = document.createElement('div');
+    div.className = 'block' + (done[i] ? ' done' : '');
+    div.innerHTML = `
+      <div class="block-header">
+        <div class="block-meta">
+          <div class="block-num">${done[i] ? '✓' : (i+1)}</div>
+          <div class="block-title">${b.title}</div>
+        </div>
+        <span class="block-time">${b.time} · ${timings[i]}min</span>
+      </div>
+      <div class="block-desc">${b.desc}</div>
+      <div class="block-tags" style="margin-top:10px; justify-content:space-between; align-items:center;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${b.tags.map(t => `<span class="tag ${tagClasses[t]}">${tagLabels[t]}</span>`).join('')}
+          <span class="tag tag-exercise">${b.exercises} exercise${b.exercises>1?'s':''}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${!done[i] ? `<button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="sendPrompt('${b.prompt}')">Start ↗</button>` : ''}
+          <button class="btn ${done[i]?'':'btn-done'}" style="font-size:12px;padding:5px 10px" onclick="toggleDone(${i})">${done[i]?'Undo':'Mark done ✓'}</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+  const n = done.filter(Boolean).length;
+  const pct = Math.round(n / blocks.length * 100);
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('prog-text').textContent = `${n} of ${blocks.length} blocks complete`;
+  document.getElementById('prog-pct').textContent = pct + '%';
+  document.getElementById('s-done').textContent = n;
+  const minsSpent = done.map((d,i) => d ? timings[i] : 0).reduce((a,b)=>a+b,0);
+  document.getElementById('s-min').textContent = Math.max(0, 60 - minsSpent);
+  if (n === blocks.length) {
+    document.getElementById('note-box').innerHTML = '🎉 Session complete! Run <strong>sendPrompt</strong> → "Give me a summary of everything we covered today and suggest what to study next."';
+    document.getElementById('note-box').style.borderLeftColor = '#0F6E56';
+  }
+}
+
+function toggleDone(i) {
+  done[i] = !done[i];
+  render();
+}
+
+render();
+</script>

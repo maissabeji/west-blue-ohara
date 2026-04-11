@@ -1,0 +1,165 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.wrap { padding: 1rem 0; font-family: var(--font-sans); }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+.btn { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-primary); cursor: pointer; transition: background 0.12s; }
+.btn:hover { background: var(--color-background-secondary); }
+.btn.active { background: #EEEDFE; color: #3C3489; border-color: #534AB7; }
+.label { font-size: 12px; color: var(--color-text-secondary); }
+canvas { display: block; width: 100%; border-radius: 8px; }
+.eq { font-size: 13px; color: var(--color-text-secondary); margin-top: 8px; font-family: var(--font-mono); text-align: center; }
+</style>
+<div class="wrap">
+  <div class="controls">
+    <span class="label">Transform:</span>
+    <button class="btn active" id="btn-rot" onclick="setMode('rotate')">Rotation</button>
+    <button class="btn" id="btn-scale" onclick="setMode('scale')">Scaling</button>
+    <button class="btn" id="btn-shear" onclick="setMode('shear')">Shear</button>
+    <button class="btn" id="btn-proj" onclick="setMode('project')">Projection</button>
+    <button class="btn" id="btn-comp" onclick="setMode('compose')">A then B (compose)</button>
+  </div>
+  <canvas id="c" height="300"></canvas>
+  <div class="eq" id="eq-label">A = [[cos θ, -sin θ], [sin θ, cos θ]]</div>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const DPR = window.devicePixelRatio || 1;
+
+function resize() {
+  const w = canvas.parentElement.offsetWidth;
+  canvas.style.width = w + 'px';
+  canvas.style.height = '300px';
+  canvas.width = w * DPR;
+  canvas.height = 300 * DPR;
+  ctx.scale(DPR, DPR);
+  draw();
+}
+
+let mode = 'rotate';
+let t = 0;
+let animId;
+
+const modes = {
+  rotate: { label: 'A = [[cos θ, −sin θ], [sin θ, cos θ]]  — rotates every vector by angle θ', mat: (t) => [[Math.cos(t), -Math.sin(t)],[Math.sin(t), Math.cos(t)]] },
+  scale:  { label: 'A = [[2, 0], [0, 0.5]]  — stretches x-axis, compresses y-axis', mat: (t) => [[1 + Math.sin(t)*0.8, 0],[0, 1 - Math.sin(t)*0.4]] },
+  shear:  { label: 'A = [[1, k], [0, 1]]  — slides horizontal layers sideways', mat: (t) => [[1, Math.sin(t)*1.2],[0, 1]] },
+  project:{ label: 'A = [[1, 0], [0, 0]]  — collapses all vectors onto x-axis (rank = 1)', mat: (t) => [[1, 0],[0, (Math.cos(t)+1)*0.5]] },
+  compose:{ label: 'C = A·B  — first rotate, then scale. Order matters!', mat: (t) => {
+    const R = [[Math.cos(t*0.7), -Math.sin(t*0.7)],[Math.sin(t*0.7), Math.cos(t*0.7)]];
+    const S = [[1.6, 0],[0, 0.5]];
+    return [[S[0][0]*R[0][0]+S[0][1]*R[1][0], S[0][0]*R[0][1]+S[0][1]*R[1][1]],
+            [S[1][0]*R[0][0]+S[1][1]*R[1][0], S[1][0]*R[0][1]+S[1][1]*R[1][1]]];
+  }}
+};
+
+function isDark() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function gridColor() { return isDark() ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'; }
+function axisColor() { return isDark() ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'; }
+function textColor() { return isDark() ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)'; }
+
+function applyMat(M, v) { return [M[0][0]*v[0]+M[0][1]*v[1], M[1][0]*v[0]+M[1][1]*v[1]]; }
+
+function draw() {
+  const W = canvas.width / DPR, H = canvas.height / DPR;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W * 0.5, cy = H * 0.5;
+  const scale = Math.min(W, H) * 0.32;
+
+  function toScreen(v) { return [cx + v[0]*scale, cy - v[1]*scale]; }
+
+  // Grid (original)
+  ctx.strokeStyle = gridColor();
+  ctx.lineWidth = 0.5;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath(); ctx.moveTo(cx + i*scale, cy - 3*scale); ctx.lineTo(cx + i*scale, cy + 3*scale); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 3*scale, cy - i*scale); ctx.lineTo(cx + 3*scale, cy - i*scale); ctx.stroke();
+  }
+
+  const M = modes[mode].mat(t);
+
+  // Transformed grid
+  ctx.strokeStyle = mode === 'project' ? 'rgba(83,74,183,0.15)' : 'rgba(83,74,183,0.12)';
+  ctx.lineWidth = 0.7;
+  for (let i = -3; i <= 3; i++) {
+    const p1t = applyMat(M, [i, -3]), p2t = applyMat(M, [i, 3]);
+    const p3t = applyMat(M, [-3, i]), p4t = applyMat(M, [3, i]);
+    const s1 = toScreen(p1t), s2 = toScreen(p2t), s3 = toScreen(p3t), s4 = toScreen(p4t);
+    ctx.beginPath(); ctx.moveTo(s1[0],s1[1]); ctx.lineTo(s2[0],s2[1]); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s3[0],s3[1]); ctx.lineTo(s4[0],s4[1]); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = axisColor();
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx - 3*scale, cy); ctx.lineTo(cx + 3*scale, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, cy - 3*scale); ctx.lineTo(cx, cy + 3*scale); ctx.stroke();
+
+  // Original basis vectors
+  function arrow(from, to, color, width, label) {
+    const [x1,y1] = toScreen(from), [x2,y2] = toScreen(to);
+    const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy);
+    if (len < 2) return;
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    const angle = Math.atan2(dy,dx);
+    ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2 - 10*Math.cos(angle-0.35), y2 - 10*Math.sin(angle-0.35));
+    ctx.lineTo(x2 - 10*Math.cos(angle+0.35), y2 - 10*Math.sin(angle+0.35));
+    ctx.closePath(); ctx.fill();
+    if (label) {
+      ctx.font = '500 12px var(--font-sans)';
+      ctx.fillText(label, x2+7*Math.cos(angle+0.8), y2+7*Math.sin(angle+0.8));
+    }
+  }
+
+  // Original e1, e2 (light)
+  arrow([0,0],[1,0], isDark()?'rgba(255,255,255,0.2)':'rgba(0,0,0,0.18)', 1.5, '');
+  arrow([0,0],[0,1], isDark()?'rgba(255,255,255,0.2)':'rgba(0,0,0,0.18)', 1.5, '');
+
+  // Transformed basis vectors
+  const e1t = applyMat(M,[1,0]), e2t = applyMat(M,[0,1]);
+  arrow([0,0], e1t, '#BA7517', 2.5, 'Ae₁');
+  arrow([0,0], e2t, '#534AB7', 2.5, 'Ae₂');
+
+  // Parallelogram
+  const [p1x,p1y] = toScreen(e1t), [p2x,p2y] = toScreen(e2t);
+  const [sumX,sumY] = toScreen([e1t[0]+e2t[0], e1t[1]+e2t[1]]);
+  ctx.beginPath();
+  ctx.moveTo(cx,cy); ctx.lineTo(p1x,p1y); ctx.lineTo(sumX,sumY); ctx.lineTo(p2x,p2y); ctx.closePath();
+  ctx.fillStyle = 'rgba(83,74,183,0.08)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(83,74,183,0.3)'; ctx.lineWidth = 0.8; ctx.stroke();
+
+  // Det label
+  const det = M[0][0]*M[1][1] - M[0][1]*M[1][0];
+  ctx.fillStyle = textColor();
+  ctx.font = '12px var(--font-sans)';
+  ctx.fillText('det = ' + det.toFixed(2), 8, H - 10);
+  if (mode === 'project') {
+    ctx.fillStyle = '#A32D2D';
+    ctx.fillText('rank = 1  (lost a dimension)', 8, H - 26);
+  }
+}
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + m.replace('compose','comp')).classList.add('active');
+  document.getElementById('eq-label').textContent = modes[m].label;
+}
+
+function animate() {
+  t += 0.018;
+  draw();
+  animId = requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', resize);
+resize();
+animate();
+</script>
